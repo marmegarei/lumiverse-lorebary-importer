@@ -206,13 +206,13 @@ spindle.onFrontendMessage(async (payload, userId) => {
     const { character, book } = payload.filename ? convertText(String(payload.text ?? ""), payload.filename) : convert(String(payload.text ?? ""));
     let bookId;
     if (book) {
-      const created = await spindle.world_books.create({ name: book.name, description: book.description });
+      const created = await spindle.world_books.create({ name: book.name, description: book.description }, userId);
       bookId = created.id;
       for (const entry of book.entries)
-        await spindle.world_books.entries.create(bookId, entry);
+        await spindle.world_books.entries.create(bookId, entry, userId);
     }
     if (character) {
-      await spindle.characters.create({ ...character, ...bookId && { world_book_ids: [bookId] } });
+      await spindle.characters.create({ ...character, ...bookId && { world_book_ids: [bookId] } }, userId);
     }
     const what = character ? character.name : book.name;
     reply({ type: "result", ok: true, message: `${what}${book ? ` (${book.entries.length} lore entries)` : ""}` });
