@@ -87,3 +87,49 @@ test('txt: title / Name: / filename fallback; whole text kept as description', (
   expect(convertText(JSON.stringify({ name: 'X', initialMessages: [] })).character!.name).toBe('X')
   expect(() => convertText('  ')).toThrow('Empty')
 })
+
+// --- current LoreBary export: identity under `meta`, rest at root (same JSON in .json and inside .png) ---
+const metaRooted = {
+  meta: { name: 'Fox', author: 'me', description: 'A <i>fox</i>.', tags: ['a', 'b'], gender: 'male', age: '19', coverImage: 'data:image/webp;base64,AAAA' },
+  appearance: '【Hair】\nRed',
+  personality: JSON.parse(personality),
+  background: { backstory: 'Born in a den', traumas: { hasTraumas: false } },
+  scenario: { enabled: true, content: 'A rainy alley' },
+  initialMessages: [{ id: '1', content: 'One' }, { id: '2', content: 'Two' }],
+  exampleDialogs: [{ id: '1', userMessage: 'yo', characterResponse: 'hey' }],
+  relationships: [{ name: 'Bob', type: 'rival', status: 'unknown', description: 'Old foe' }],
+  isFreeForm: false,
+  freeFormContent: '',
+}
+
+test('meta-rooted export: fields read from meta, extras folded into description', () => {
+  const { character } = convert(JSON.stringify(metaRooted))
+  expect(character).toMatchObject({ name: 'Fox', creator: 'me', tags: ['a', 'b'], first_mes: 'One', alternate_greetings: ['Two'], scenario: 'A rainy alley', personality: 'Summary: Sly fox\nTraits: clever, vain' })
+  expect(character!.description).toStartWith('A <i>fox</i>.')
+  for (const s of ['[Appearance]', '[Background]', '[Relationships]', '[Gender]\nmale', '[Age]\n19']) expect(character!.description).toContain(s)
+  expect(character!.mes_example).toBe('<START>\n{{user}}: yo\n{{char}}: hey')
+})
+
+test('png: ~200 KB chunk (real cards embed the cover image) no longer overflows the stack', () => {
+  const big = JSON.stringify({ ...metaRooted, meta: { ...metaRooted.meta, coverImage: 'x'.repeat(200_000) } })
+  const json = pngCardJson(png(text('chara', Buffer.from(big).toString('base64'))))
+  expect(json.length).toBe(big.length)
+  expect(convert(json).character!.name).toBe('Fox')
+})
+
+test('txt full export (markdown): sections parsed, [object Object] ignored', () => {
+  const { character } = convertText(
+    [
+      '# Fox', '', '**Chat Name:** F', '**Nicknames:** [object Object]', '**Author:** me', '',
+      '## Description', 'A fox.', '', '**Tags:** a, b', '',
+      '## Personality', '**Traits:** clever, vain', '', '**Quirks:**', 'Sly.', '',
+      '## First Messages', '### Message 1', 'One', '', '### Message 2', 'Two', '',
+      '## Example Dialogs', '### Dialog 1', '**User:** *waves* "yo"', '**Fox:** *nods* "hey"', '',
+      '## Connections', '', '### Bob (Rival)', 'Old foe.',
+    ].join('\n'),
+  )
+  expect(character).toMatchObject({ name: 'Fox', creator: 'me', tags: ['a', 'b'], first_mes: 'One', alternate_greetings: ['Two'] })
+  expect(character!.personality).toBe('**Traits:** clever, vain\n\n**Quirks:**\nSly.')
+  expect(character!.description).toBe('A fox.\n\n[Relationships]\n- Bob (Rival): Old foe.')
+  expect(character!.mes_example).toBe('<START>\n{{user}}: *waves* "yo"\n{{char}}: *nods* "hey"')
+})

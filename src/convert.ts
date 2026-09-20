@@ -70,7 +70,8 @@ function extras(l: Obj): string {
     section('Appearance', str(l.appearance).trim()) +
     section('Background', render(l.background, SKIP)) +
     section('Relationships', relationshipsText(l.relationships)) +
-    section('Gender', str(l.gender))
+    section('Gender', str(l.gender)) +
+    section('Age', str(l.age))
   )
 }
 
@@ -171,21 +172,63 @@ export function convert(text: string): Converted {
   if (!isObj(r)) throw new Error('Unexpected JSON: expected an object.')
   if (isObj(r.entries) && !('spec' in r)) return fromLorebook(r)
   if (isObj(r.data) && typeof r.spec === 'string') return fromCard(r)
+  // Current LoreBary export (JSON and PNG): identity fields live under `meta`, the rest at the root.
+  if (isObj(r.meta) && typeof r.meta.name === 'string' && (isObj(r.personality) || 'initialMessages' in r || 'freeFormContent' in r)) {
+    return fromDetailed({ ...r.meta, ...r })
+  }
   if (typeof r.name === 'string' && ('initialMessages' in r || isObj(r.personality) || 'freeFormContent' in r)) return fromDetailed(r)
   throw new Error('Unrecognized format: not a Lorebary character, card or lorebook JSON.')
 }
 
-/**
- * Lorebary .txt export. ponytail: the format isn't documented, so the whole text becomes the description
- * (a freeform character); parse sections once real "full text export" samples exist.
- */
+/** `### Title\nbody` blocks of a markdown section. */
+const subs = (md = ''): [string, string][] =>
+  md
+    .split(/^### /m)
+    .slice(1)
+    .map((b): [string, string] => {
+      const nl = b.indexOf('\n')
+      return nl < 0 ? [b.trim(), ''] : [b.slice(0, nl).trim(), b.slice(nl + 1).trim()]
+    })
+
+/** Lorebary "full text export" (markdown). Has no appearance/background/scenario, only the JSON/PNG do. */
+function fromMarkdown(body: string, name: string): Converted {
+  const parts = body.split(/^## /m)
+  const sec: Record<string, string> = {}
+  for (const p of parts.slice(1)) {
+    const nl = p.indexOf('\n')
+    sec[p.slice(0, nl < 0 ? undefined : nl).trim().toLowerCase()] = nl < 0 ? '' : p.slice(nl + 1).trim()
+  }
+  const tagLine = /^\*\*Tags:\*\*[ \t]*(.*)$/m
+  const desc = sec['description'] ?? ''
+  const msgs = subs(sec['first messages']).map((s) => s[1]).filter(Boolean)
+  const dialogs = subs(sec['example dialogs']).flatMap(([, b]) => {
+    const m = b.match(/^\*\*User:\*\*[ \t]*([\s\S]*?)\n\*\*(?!User:)[^*\n]+:\*\*[ \t]*([\s\S]*)$/)
+    return m ? [`<START>\n{{user}}: ${m[1].trim()}\n{{char}}: ${m[2].trim()}`] : []
+  })
+  const links = subs(sec['connections']).map(([t, b]) => `- ${t}: ${b}`).join('\n')
+  return {
+    character: {
+      name,
+      description: (desc.replace(tagLine, '').trim() + section('Relationships', links)).trim(),
+      personality: sec['personality'] ?? '',
+      first_mes: msgs[0] ?? '',
+      alternate_greetings: msgs.slice(1),
+      mes_example: dialogs.join('\n'),
+      creator: body.match(/^\*\*Author:\*\*[ \t]*(.+)$/m)?.[1].trim() ?? '',
+      tags: (desc.match(tagLine)?.[1] ?? '').split(',').map((t) => t.trim()).filter(Boolean),
+    },
+  }
+}
+
+/** Lorebary .txt export: markdown full export when it has `## ` sections, otherwise plain text kept whole as the description. */
 export function convertText(text: string, filename = ''): Converted {
   const body = text.replace(/^﻿/, '').trim()
   if (body.startsWith('{')) return convert(body) // a .json saved as .txt
   if (!body) throw new Error('Empty file.')
   const name =
-    body.match(/^#\s+(.+)$/m)?.[1] ??
-    body.match(/^(?:name|nome)\s*:\s*(.+)$/im)?.[1] ??
+    body.match(/^#\s+(.+)$/m)?.[1].trim() ??
+    body.match(/^(?:name|nome)\s*:\s*(.+)$/im)?.[1].trim() ??
     (filename.replace(/\.[^.]+$/, '') || 'Unnamed')
-  return { character: { name: name.trim(), description: body } }
+  if (/^## (description|personality)/im.test(body)) return fromMarkdown(body, name)
+  return { character: { name, description: body } }
 }

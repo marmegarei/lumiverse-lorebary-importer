@@ -49,7 +49,7 @@ function relationshipsText(r) {
 `);
 }
 function extras(l) {
-  return section("Appearance", str(l.appearance).trim()) + section("Background", render(l.background, SKIP)) + section("Relationships", relationshipsText(l.relationships)) + section("Gender", str(l.gender));
+  return section("Appearance", str(l.appearance).trim()) + section("Background", render(l.background, SKIP)) + section("Relationships", relationshipsText(l.relationships)) + section("Gender", str(l.gender)) + section("Age", str(l.age));
 }
 function fromCard(root) {
   const d = isObj(root.data) ? root.data : {};
@@ -140,9 +140,50 @@ function convert(text) {
     return fromLorebook(r);
   if (isObj(r.data) && typeof r.spec === "string")
     return fromCard(r);
+  if (isObj(r.meta) && typeof r.meta.name === "string" && (isObj(r.personality) || ("initialMessages" in r) || ("freeFormContent" in r))) {
+    return fromDetailed({ ...r.meta, ...r });
+  }
   if (typeof r.name === "string" && (("initialMessages" in r) || isObj(r.personality) || ("freeFormContent" in r)))
     return fromDetailed(r);
   throw new Error("Unrecognized format: not a Lorebary character, card or lorebook JSON.");
+}
+var subs = (md = "") => md.split(/^### /m).slice(1).map((b) => {
+  const nl = b.indexOf(`
+`);
+  return nl < 0 ? [b.trim(), ""] : [b.slice(0, nl).trim(), b.slice(nl + 1).trim()];
+});
+function fromMarkdown(body, name) {
+  const parts = body.split(/^## /m);
+  const sec = {};
+  for (const p of parts.slice(1)) {
+    const nl = p.indexOf(`
+`);
+    sec[p.slice(0, nl < 0 ? undefined : nl).trim().toLowerCase()] = nl < 0 ? "" : p.slice(nl + 1).trim();
+  }
+  const tagLine = /^\*\*Tags:\*\*[ \t]*(.*)$/m;
+  const desc = sec["description"] ?? "";
+  const msgs = subs(sec["first messages"]).map((s) => s[1]).filter(Boolean);
+  const dialogs = subs(sec["example dialogs"]).flatMap(([, b]) => {
+    const m = b.match(/^\*\*User:\*\*[ \t]*([\s\S]*?)\n\*\*(?!User:)[^*\n]+:\*\*[ \t]*([\s\S]*)$/);
+    return m ? [`<START>
+{{user}}: ${m[1].trim()}
+{{char}}: ${m[2].trim()}`] : [];
+  });
+  const links = subs(sec["connections"]).map(([t, b]) => `- ${t}: ${b}`).join(`
+`);
+  return {
+    character: {
+      name,
+      description: (desc.replace(tagLine, "").trim() + section("Relationships", links)).trim(),
+      personality: sec["personality"] ?? "",
+      first_mes: msgs[0] ?? "",
+      alternate_greetings: msgs.slice(1),
+      mes_example: dialogs.join(`
+`),
+      creator: body.match(/^\*\*Author:\*\*[ \t]*(.+)$/m)?.[1].trim() ?? "",
+      tags: (desc.match(tagLine)?.[1] ?? "").split(",").map((t) => t.trim()).filter(Boolean)
+    }
+  };
 }
 function convertText(text, filename = "") {
   const body = text.replace(/^\uFEFF/, "").trim();
@@ -150,8 +191,10 @@ function convertText(text, filename = "") {
     return convert(body);
   if (!body)
     throw new Error("Empty file.");
-  const name = body.match(/^#\s+(.+)$/m)?.[1] ?? body.match(/^(?:name|nome)\s*:\s*(.+)$/im)?.[1] ?? (filename.replace(/\.[^.]+$/, "") || "Unnamed");
-  return { character: { name: name.trim(), description: body } };
+  const name = body.match(/^#\s+(.+)$/m)?.[1].trim() ?? body.match(/^(?:name|nome)\s*:\s*(.+)$/im)?.[1].trim() ?? (filename.replace(/\.[^.]+$/, "") || "Unnamed");
+  if (/^## (description|personality)/im.test(body))
+    return fromMarkdown(body, name);
+  return { character: { name, description: body } };
 }
 
 // src/backend.ts

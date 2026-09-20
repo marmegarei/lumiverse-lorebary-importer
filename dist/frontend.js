@@ -1,4 +1,5 @@
 // src/png.ts
+var latin1 = new TextDecoder("latin1");
 var SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 function pngCardJson(bytes) {
   if (bytes.length < 8 || SIGNATURE.some((b, i) => bytes[i] !== b))
@@ -7,13 +8,13 @@ function pngCardJson(bytes) {
   const found = {};
   for (let pos = 8;pos + 12 <= bytes.length; ) {
     const len = view.getUint32(pos);
-    const type = String.fromCharCode(...bytes.subarray(pos + 4, pos + 8));
+    const type = latin1.decode(bytes.subarray(pos + 4, pos + 8));
     if (type === "tEXt") {
       const data = bytes.subarray(pos + 8, pos + 8 + len);
       const nul = data.indexOf(0);
-      const key = String.fromCharCode(...data.subarray(0, nul));
+      const key = latin1.decode(data.subarray(0, nul));
       if (key === "ccv3" || key === "chara")
-        found[key] = String.fromCharCode(...data.subarray(nul + 1));
+        found[key] = latin1.decode(data.subarray(nul + 1));
     }
     if (type === "IEND")
       break;

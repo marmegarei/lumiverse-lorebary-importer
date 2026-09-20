@@ -8,15 +8,17 @@ Extensão Spindle para o Lumiverse que importa exports **JSON do LoreBary** como
 
 | LoreBary export | Result in Lumiverse |
 |---|---|
+| **Current LoreBary JSON export** (identity under `meta`; same JSON is inside its `.png`) | Character with first message + extra greetings, example dialogs, scenario, tags, creator. Personality becomes readable text; appearance, background, relationships, gender and age are folded into the description |
 | Character card JSON (`chara_card_v2`, structured) | Character. `personality` (a JSON object inside a string) becomes readable text; appearance, background, relationships and gender are folded into the description instead of being lost |
 | "Detailed" character JSON | Character with first message, extra greetings, example dialogs, scenario, tags |
 | Freeform character | Character (freeform text kept as the description) |
 | `.png` card (`chara` / `ccv3` chunk) | Same as the card JSON above: the embedded JSON is read from the PNG |
-| `.txt` export | Character imported as freeform text: name from `# Title` / `Name:` / filename, the whole text as description |
+| `.txt` full export (markdown) | Parsed by section: description, tags, author, personality, first messages, example dialogs, connections (as relationships). It has no appearance/background/scenario, so **the `.json`/`.png` gives a more complete character** |
+| other `.txt` | Freeform: name from `# Title` / `Name:` / filename, the whole text as description |
 | Lorebook JSON | World book with all entries (keys, secondary keys, constant, order, position) |
 | Card with an embedded standard V2 `character_book` | Character + attached world book |
 
-Limits: the PNG's image is **not** set as the avatar (the Spindle API can't set it; Lumiverse's own PNG import does), the `spectrums` sliders are dropped (axis meaning is undocumented), and the TXT format isn't documented by LoreBary so it is imported as plain freeform text. Send a sample TXT export and it can be parsed by section.
+Limits: the PNG's image is **not** set as the avatar (the Spindle API can't set it; Lumiverse's own PNG import does), the `spectrums` sliders are dropped (axis meaning is undocumented), and the character's cover image is not imported.
 
 ## Install / Instalação
 
