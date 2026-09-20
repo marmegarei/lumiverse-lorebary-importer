@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "name": "Lorebary Importer",
+  "identifier": "lorebary_importer",
+  "author": "marmegarei",
+  "github": "https://github.com/marmegarei/lumiverse-lorebary-importer",
+  "homepage": "https://github.com/marmegarei/lumiverse-lorebary-importer",
+  "description": "Import LoreBary characters and lorebooks (JSON) into Lumiverse.",
+  "permissions": ["characters", "world_books"],
+  "entry_backend": "dist/backend.js",
+  "entry_frontend": "dist/frontend.js",
+  "minimum_lumiverse_version": "0.1.0"
+}

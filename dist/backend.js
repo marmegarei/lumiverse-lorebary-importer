@@ -1,0 +1,171 @@
+// @bun
+// src/convert.ts
+var isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+var str = (v) => typeof v === "string" ? v : "";
+var strs = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string" && x) : [];
+var label = (k) => k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+function render(v, skip = [], depth = 0) {
+  if (typeof v === "string")
+    return v.trim();
+  if (typeof v === "number")
+    return String(v);
+  if (Array.isArray(v)) {
+    const items = v.map((x) => render(x, skip, depth + 1)).filter(Boolean);
+    return items.every((s) => !s.includes(`
+`)) ? items.join(", ") : items.map((s) => `- ${s}`).join(`
+`);
+  }
+  if (!isObj(v))
+    return "";
+  return Object.entries(v).filter(([k]) => !skip.includes(k)).map(([k, x]) => {
+    if (x === true)
+      return `${label(k)}: yes`;
+    const t = render(x, skip, depth + 1);
+    if (!t)
+      return "";
+    return t.includes(`
+`) || isObj(x) ? `${label(k)}:
+${t}` : `${label(k)}: ${t}`;
+  }).filter(Boolean).join(`
+`);
+}
+var SKIP = ["spectrums", "hasTraumas", "hasRecord"];
+var section = (title, body) => body ? `
+
+[${title}]
+${body}` : "";
+function personalityText(p) {
+  if (typeof p === "string" && p.trim().startsWith("{")) {
+    try {
+      p = JSON.parse(p);
+    } catch {}
+  }
+  return render(p, SKIP);
+}
+function relationshipsText(r) {
+  if (!Array.isArray(r))
+    return "";
+  return r.filter(isObj).map((x) => `- ${str(x.name)} (${[str(x.type), str(x.status)].filter(Boolean).join(", ")}): ${str(x.description)}`).join(`
+`);
+}
+function extras(l) {
+  return section("Appearance", str(l.appearance).trim()) + section("Background", render(l.background, SKIP)) + section("Relationships", relationshipsText(l.relationships)) + section("Gender", str(l.gender));
+}
+function fromCard(root) {
+  const d = isObj(root.data) ? root.data : {};
+  const l = isObj(d.extensions?.lorebary) ? d.extensions.lorebary : {};
+  const structured = typeof d.personality === "string" && d.personality.trim().startsWith("{");
+  const ext = { ...d.extensions };
+  delete ext.lorebary;
+  const out = {
+    character: {
+      name: str(d.name) || "Unnamed",
+      description: (str(d.description) + (l.isFreeForm ? "" : extras(l))).trimEnd(),
+      personality: structured ? personalityText(d.personality) : str(d.personality) || personalityText(l.personality),
+      scenario: str(d.scenario),
+      first_mes: str(d.first_mes),
+      mes_example: str(d.mes_example),
+      creator: str(d.creator),
+      creator_notes: str(d.creator_notes),
+      system_prompt: str(d.system_prompt),
+      post_history_instructions: str(d.post_history_instructions),
+      tags: strs(d.tags),
+      alternate_greetings: strs(d.alternate_greetings),
+      extensions: ext
+    }
+  };
+  if (isObj(d.character_book) && Array.isArray(d.character_book.entries)) {
+    out.book = {
+      name: str(d.character_book.name) || `${out.character.name} Lorebook`,
+      description: str(d.character_book.description),
+      entries: d.character_book.entries.filter(isObj).map((e) => ({
+        key: strs(e.keys),
+        keysecondary: strs(e.secondary_keys),
+        content: str(e.content),
+        comment: str(e.comment) || str(e.name),
+        constant: !!e.constant,
+        selective: !!e.selective,
+        disabled: e.enabled === false,
+        order_value: Number(e.insertion_order ?? e.priority ?? 100)
+      }))
+    };
+  }
+  return out;
+}
+function fromDetailed(r) {
+  const msgs = (Array.isArray(r.initialMessages) ? r.initialMessages : []).filter((m) => isObj(m) && m.isEnabled !== false && str(m.content)).map((m) => m.content);
+  const dialogs = (Array.isArray(r.exampleDialogs) ? r.exampleDialogs : []).filter((x) => isObj(x) && (str(x.userMessage) || str(x.characterResponse))).map((x) => `<START>
+{{user}}: ${str(x.userMessage)}
+{{char}}: ${str(x.characterResponse)}`);
+  const free = r.isFreeForm ? str(r.freeFormContent) : "";
+  return {
+    character: {
+      name: str(r.name) || "Unnamed",
+      description: free || (str(r.description) + extras(r)).trimEnd(),
+      personality: free ? "" : personalityText(r.personality),
+      scenario: isObj(r.scenario) && r.scenario.enabled ? str(r.scenario.content) : "",
+      first_mes: msgs[0] ?? "",
+      alternate_greetings: msgs.slice(1),
+      mes_example: dialogs.join(`
+`),
+      creator: str(r.author),
+      tags: strs(r.tags)
+    }
+  };
+}
+function fromLorebook(r) {
+  const entries = Object.values(r.entries).filter(isObj).map((e) => ({
+    key: strs(e.key),
+    keysecondary: strs(e.keysecondary),
+    content: str(e.content),
+    comment: str(e.comment) || strs(e.key)[0] || "",
+    constant: !!e.constant,
+    selective: !!e.selective && strs(e.keysecondary).length > 0,
+    disabled: !!e.disable,
+    order_value: Number(e.order ?? 100),
+    position: Number(e.position ?? 0)
+  }));
+  return { book: { name: str(r.name) || "Lorebary Lorebook", description: str(r.description), entries } };
+}
+function convert(text) {
+  let r;
+  try {
+    r = JSON.parse(text);
+  } catch {
+    throw new Error('Not valid JSON. Export the character as "JSON" from Lorebary (TXT / PNG are not supported here).');
+  }
+  if (!isObj(r))
+    throw new Error("Unexpected JSON: expected an object.");
+  if (isObj(r.entries) && !("spec" in r))
+    return fromLorebook(r);
+  if (isObj(r.data) && typeof r.spec === "string")
+    return fromCard(r);
+  if (typeof r.name === "string" && (("initialMessages" in r) || isObj(r.personality) || ("freeFormContent" in r)))
+    return fromDetailed(r);
+  throw new Error("Unrecognized format: not a Lorebary character, card or lorebook JSON.");
+}
+
+// src/backend.ts
+spindle.onFrontendMessage(async (payload, userId) => {
+  if (payload?.type !== "import")
+    return;
+  const reply = (msg) => spindle.sendToFrontend({ ...msg, id: payload.id }, userId);
+  try {
+    const { character, book } = convert(String(payload.text ?? ""));
+    let bookId;
+    if (book) {
+      const created = await spindle.world_books.create({ name: book.name, description: book.description });
+      bookId = created.id;
+      for (const entry of book.entries)
+        await spindle.world_books.entries.create(bookId, entry);
+    }
+    if (character) {
+      await spindle.characters.create({ ...character, ...bookId && { world_book_ids: [bookId] } });
+    }
+    const what = character ? character.name : book.name;
+    reply({ type: "result", ok: true, message: `${what}${book ? ` (${book.entries.length} lore entries)` : ""}` });
+  } catch (err) {
+    reply({ type: "result", ok: false, message: err?.message ?? String(err) });
+  }
+});
+spindle.log.info("Lorebary Importer loaded");
