@@ -232,3 +232,21 @@ export function convertText(text: string, filename = ''): Converted {
   if (/^## (description|personality)/im.test(body)) return fromMarkdown(body, name)
   return { character: { name, description: body } }
 }
+
+/** Character code from a lorebary.com link (`...?view=7DFB7D95`) or a bare code. Never returns a URL to fetch. */
+export function lorebaryCode(input: string): string {
+  const s = input.trim()
+  let code = s
+  if (/^https?:\/\//i.test(s)) {
+    let u: URL
+    try {
+      u = new URL(s)
+    } catch {
+      throw new Error('Not a valid link.')
+    }
+    if (u.hostname !== 'lorebary.com' && !u.hostname.endsWith('.lorebary.com')) throw new Error('Not a lorebary.com link.')
+    code = u.searchParams.get('view') ?? ''
+  }
+  if (!/^[A-Za-z0-9]{4,20}$/.test(code)) throw new Error('Not a LoreBary character link (expected ...?view=CODE).')
+  return code
+}

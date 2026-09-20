@@ -4,6 +4,12 @@ Spindle extension for [Lumiverse](https://github.com/prolix-oc/Lumiverse) that i
 
 Extensão Spindle para o Lumiverse que importa exports **JSON do LoreBary** como personagens e world books nativos. Grátis, licença MIT: usa, faz fork, melhora.
 
+## Import by link / Importar por link
+
+Paste a LoreBary character link (e.g. `https://lorebary.com/character-marketplace?view=7DFB7D95`) or just its code in the **Lorebary** tab and press *Import from link(s)*; one per line for several. The server downloads the character's public card from LoreBary and imports it. Needs the `cors_proxy` permission (LoreBary's API has no CORS headers, so the request goes through the Lumiverse server). Only characters, and only if the creator allows downloads; otherwise you get LoreBary's error message.
+
+Cola o link de um personagem do LoreBary (ou só o código) no separador **Lorebary** e carrega em *Import from link(s)*. Só personagens, e só se o criador permitir downloads.
+
 ## What it converts / O que converte
 
 | LoreBary export | Result in Lumiverse |

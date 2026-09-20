@@ -133,3 +133,16 @@ test('txt full export (markdown): sections parsed, [object Object] ignored', () 
   expect(character!.description).toBe('A fox.\n\n[Relationships]\n- Bob (Rival): Old foe.')
   expect(character!.mes_example).toBe('<START>\n{{user}}: *waves* "yo"\n{{char}}: *nods* "hey"')
 })
+
+import { lorebaryCode } from '../src/convert'
+
+test('lorebaryCode: link or bare code, lorebary.com only', () => {
+  expect(lorebaryCode('https://lorebary.com/character-marketplace?view=7DFB7D95')).toBe('7DFB7D95')
+  expect(lorebaryCode(' https://www.lorebary.com/character-marketplace?x=1&view=7DFB7D95&y=2 ')).toBe('7DFB7D95')
+  expect(lorebaryCode('7DFB7D95')).toBe('7DFB7D95')
+  expect(() => lorebaryCode('https://evil.com/character-marketplace?view=7DFB7D95')).toThrow('lorebary.com')
+  expect(() => lorebaryCode('https://lorebary.com.evil.com/?view=7DFB7D95')).toThrow('lorebary.com')
+  expect(() => lorebaryCode('https://lorebary.com/character-marketplace')).toThrow('Not a LoreBary')
+  expect(() => lorebaryCode('https://lorebary.com/?view=../../x')).toThrow('Not a LoreBary')
+  expect(() => lorebaryCode('hello world')).toThrow('Not a LoreBary')
+})

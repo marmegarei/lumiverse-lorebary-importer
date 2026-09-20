@@ -196,14 +196,44 @@ function convertText(text, filename = "") {
     return fromMarkdown(body, name);
   return { character: { name, description: body } };
 }
+function lorebaryCode(input) {
+  const s = input.trim();
+  let code = s;
+  if (/^https?:\/\//i.test(s)) {
+    let u;
+    try {
+      u = new URL(s);
+    } catch {
+      throw new Error("Not a valid link.");
+    }
+    if (u.hostname !== "lorebary.com" && !u.hostname.endsWith(".lorebary.com"))
+      throw new Error("Not a lorebary.com link.");
+    code = u.searchParams.get("view") ?? "";
+  }
+  if (!/^[A-Za-z0-9]{4,20}$/.test(code))
+    throw new Error("Not a LoreBary character link (expected ...?view=CODE).");
+  return code;
+}
 
 // src/backend.ts
+var API = "https://lorebary.com/api/character/download/";
+async function downloadCard(link) {
+  const res = await spindle.cors(API + lorebaryCode(link), { method: "GET", headers: { Accept: "application/json" } });
+  if (res.status !== 200) {
+    let msg = "";
+    try {
+      msg = JSON.parse(res.body).message;
+    } catch {}
+    throw new Error(msg || `LoreBary returned HTTP ${res.status}`);
+  }
+  return res.body;
+}
 spindle.onFrontendMessage(async (payload, userId) => {
-  if (payload?.type !== "import")
+  if (payload?.type !== "import" && payload?.type !== "import_url")
     return;
   const reply = (msg) => spindle.sendToFrontend({ ...msg, id: payload.id }, userId);
   try {
-    const { character, book } = payload.filename ? convertText(String(payload.text ?? ""), payload.filename) : convert(String(payload.text ?? ""));
+    const { character, book } = payload.type === "import_url" ? convert(await downloadCard(String(payload.url ?? ""))) : payload.filename ? convertText(String(payload.text ?? ""), payload.filename) : convert(String(payload.text ?? ""));
     let bookId;
     if (book) {
       const created = await spindle.world_books.create({ name: book.name, description: book.description }, userId);
