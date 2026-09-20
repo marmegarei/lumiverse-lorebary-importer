@@ -9,6 +9,8 @@ export interface BookOut {
 export interface Converted {
   character?: CharacterCreateDTO
   book?: BookOut
+  /** `data:image/...;base64,...` cover embedded in the export, when there is one. */
+  cover?: string
 }
 
 type Obj = Record<string, any>
@@ -129,6 +131,7 @@ function fromDetailed(r: Obj): Converted {
     .map((x: Obj) => `<START>\n{{user}}: ${str(x.userMessage)}\n{{char}}: ${str(x.characterResponse)}`)
   const free = r.isFreeForm ? str(r.freeFormContent) : ''
   return {
+    cover: str(r.coverImage).startsWith('data:image/') ? r.coverImage : undefined,
     character: {
       name: str(r.name) || 'Unnamed',
       description: free || (str(r.description) + extras(r)).trimEnd(),
@@ -249,4 +252,17 @@ export function lorebaryCode(input: string): string {
   }
   if (!/^[A-Za-z0-9]{4,20}$/.test(code)) throw new Error('Not a LoreBary character link (expected ...?view=CODE).')
   return code
+}
+
+export interface Image {
+  bytes: Uint8Array
+  mime: string
+}
+
+export const b64Bytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+
+/** `data:image/webp;base64,....` -> bytes, or undefined if it isn't a base64 image data URI. */
+export function dataUriImage(uri: string | undefined): Image | undefined {
+  const m = uri?.match(/^data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/i)
+  return m ? { bytes: b64Bytes(m[2]), mime: m[1].toLowerCase() } : undefined
 }

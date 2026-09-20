@@ -24,7 +24,7 @@ Cola o link de um personagem do LoreBary (ou só o código) no separador **Loreb
 | Lorebook JSON | World book with all entries (keys, secondary keys, constant, order, position) |
 | Card with an embedded standard V2 `character_book` | Character + attached world book |
 
-Limits: the PNG's image is **not** set as the avatar (the Spindle API can't set it; Lumiverse's own PNG import does), the `spectrums` sliders are dropped (axis meaning is undocumented), and the character's cover image is not imported.
+Avatar: for a `.png` the card image itself becomes the avatar; for a link, LoreBary's cover; for a `.json` only if it embeds a `coverImage`. If setting it fails the character is still imported and the result line says so. Limits: the `spectrums` sliders are dropped (axis meaning is undocumented),.
 
 ## Install / Instalação
 

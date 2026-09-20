@@ -1,6 +1,13 @@
 import type { SpindleFrontendContext } from 'lumiverse-spindle-types'
 import { pngCardJson } from './png'
 
+// Chunked: spreading a whole PNG into fromCharCode() would overflow the stack.
+const toB64 = (u8: Uint8Array) => {
+  let s = ''
+  for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000))
+  return btoa(s)
+}
+
 export function setup(ctx: SpindleFrontendContext) {
   const tab = ctx.ui.registerDrawerTab({
     id: 'import',
@@ -45,7 +52,11 @@ export function setup(ctx: SpindleFrontendContext) {
         try {
           const png = /\.png$/i.test(f.name)
           const text = png ? pngCardJson(f.bytes) : new TextDecoder().decode(f.bytes)
-          ctx.sendToBackend({ type: 'import', id, text, filename: /\.txt$/i.test(f.name) ? f.name : undefined })
+          ctx.sendToBackend({
+            type: 'import', id, text,
+            filename: /\.txt$/i.test(f.name) ? f.name : undefined,
+            avatar: png ? { b64: toB64(f.bytes), mime: 'image/png' } : undefined, // the card image itself
+          })
         } catch (e: any) {
           line(`✗ ${f.name}: ${e?.message ?? e}`)
         }

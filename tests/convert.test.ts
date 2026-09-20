@@ -146,3 +146,15 @@ test('lorebaryCode: link or bare code, lorebary.com only', () => {
   expect(() => lorebaryCode('https://lorebary.com/?view=../../x')).toThrow('Not a LoreBary')
   expect(() => lorebaryCode('hello world')).toThrow('Not a LoreBary')
 })
+
+import { dataUriImage } from '../src/convert'
+
+test('cover: data URI in the export becomes image bytes; junk is ignored', () => {
+  const uri = 'data:image/webp;base64,' + Buffer.from([1, 2, 3, 4]).toString('base64')
+  const { cover } = convert(JSON.stringify({ ...metaRooted, meta: { ...metaRooted.meta, coverImage: uri } }))
+  expect(cover).toBe(uri)
+  expect(dataUriImage(cover)).toEqual({ bytes: new Uint8Array([1, 2, 3, 4]), mime: 'image/webp' })
+  expect(dataUriImage('https://x/y.png')).toBeUndefined()
+  expect(dataUriImage(undefined)).toBeUndefined()
+  expect(convert(JSON.stringify({ ...metaRooted, meta: { ...metaRooted.meta, coverImage: null } })).cover).toBeUndefined()
+})

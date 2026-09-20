@@ -27,6 +27,12 @@ function pngCardJson(bytes) {
 }
 
 // src/frontend.ts
+var toB64 = (u8) => {
+  let s = "";
+  for (let i = 0;i < u8.length; i += 32768)
+    s += String.fromCharCode(...u8.subarray(i, i + 32768));
+  return btoa(s);
+};
 function setup(ctx) {
   const tab = ctx.ui.registerDrawerTab({
     id: "import",
@@ -68,7 +74,13 @@ function setup(ctx) {
         try {
           const png = /\.png$/i.test(f.name);
           const text = png ? pngCardJson(f.bytes) : new TextDecoder().decode(f.bytes);
-          ctx.sendToBackend({ type: "import", id, text, filename: /\.txt$/i.test(f.name) ? f.name : undefined });
+          ctx.sendToBackend({
+            type: "import",
+            id,
+            text,
+            filename: /\.txt$/i.test(f.name) ? f.name : undefined,
+            avatar: png ? { b64: toB64(f.bytes), mime: "image/png" } : undefined
+          });
         } catch (e) {
           line(`✗ ${f.name}: ${e?.message ?? e}`);
         }
