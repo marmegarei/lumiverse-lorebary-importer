@@ -11,10 +11,12 @@ Extensão Spindle para o Lumiverse que importa exports **JSON do LoreBary** como
 | Character card JSON (`chara_card_v2`, structured) | Character. `personality` (a JSON object inside a string) becomes readable text; appearance, background, relationships and gender are folded into the description instead of being lost |
 | "Detailed" character JSON | Character with first message, extra greetings, example dialogs, scenario, tags |
 | Freeform character | Character (freeform text kept as the description) |
+| `.png` card (`chara` / `ccv3` chunk) | Same as the card JSON above: the embedded JSON is read from the PNG |
+| `.txt` export | Character imported as freeform text: name from `# Title` / `Name:` / filename, the whole text as description |
 | Lorebook JSON | World book with all entries (keys, secondary keys, constant, order, position) |
 | Card with an embedded standard V2 `character_book` | Character + attached world book |
 
-Not supported: TXT exports and PNG cards (Lumiverse already imports standard PNG cards natively), cover images, the `spectrums` sliders (axis meaning is undocumented).
+Limits: the PNG's image is **not** set as the avatar (the Spindle API can't set it; Lumiverse's own PNG import does), the `spectrums` sliders are dropped (axis meaning is undocumented), and the TXT format isn't documented by LoreBary so it is imported as plain freeform text. Send a sample TXT export and it can be parsed by section.
 
 ## Install / Instalação
 
@@ -24,7 +26,7 @@ Lumiverse → Extensions panel → install from GitHub URL:
 https://github.com/marmegarei/lumiverse-lorebary-importer
 ```
 
-Grant the `characters` and `world_books` permissions. Then open **Lorebary** in the sidebar (or `Ctrl+K`), pick one or more `.json` files.
+Grant the `characters` and `world_books` permissions. Then open **Lorebary** in the sidebar (or `Ctrl+K`), pick one or more `.json`, `.png` or `.txt` files.
 
 ## Develop
 

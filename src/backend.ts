@@ -1,5 +1,5 @@
 import type { SpindleAPI } from 'lumiverse-spindle-types'
-import { convert } from './convert'
+import { convert, convertText } from './convert'
 
 declare const spindle: SpindleAPI
 
@@ -7,7 +7,7 @@ spindle.onFrontendMessage(async (payload: any, userId) => {
   if (payload?.type !== 'import') return
   const reply = (msg: object) => spindle.sendToFrontend({ ...msg, id: payload.id }, userId)
   try {
-    const { character, book } = convert(String(payload.text ?? ''))
+    const { character, book } = (payload.filename ? convertText(String(payload.text ?? ''), payload.filename) : convert(String(payload.text ?? '')))
     let bookId: string | undefined
     if (book) {
       const created = await spindle.world_books.create({ name: book.name, description: book.description })

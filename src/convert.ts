@@ -166,11 +166,26 @@ export function convert(text: string): Converted {
   try {
     r = JSON.parse(text)
   } catch {
-    throw new Error('Not valid JSON. Export the character as "JSON" from Lorebary (TXT / PNG are not supported here).')
+    throw new Error('Not valid JSON.')
   }
   if (!isObj(r)) throw new Error('Unexpected JSON: expected an object.')
   if (isObj(r.entries) && !('spec' in r)) return fromLorebook(r)
   if (isObj(r.data) && typeof r.spec === 'string') return fromCard(r)
   if (typeof r.name === 'string' && ('initialMessages' in r || isObj(r.personality) || 'freeFormContent' in r)) return fromDetailed(r)
   throw new Error('Unrecognized format: not a Lorebary character, card or lorebook JSON.')
+}
+
+/**
+ * Lorebary .txt export. ponytail: the format isn't documented, so the whole text becomes the description
+ * (a freeform character); parse sections once real "full text export" samples exist.
+ */
+export function convertText(text: string, filename = ''): Converted {
+  const body = text.replace(/^﻿/, '').trim()
+  if (body.startsWith('{')) return convert(body) // a .json saved as .txt
+  if (!body) throw new Error('Empty file.')
+  const name =
+    body.match(/^#\s+(.+)$/m)?.[1] ??
+    body.match(/^(?:name|nome)\s*:\s*(.+)$/im)?.[1] ??
+    (filename.replace(/\.[^.]+$/, '') || 'Unnamed')
+  return { character: { name: name.trim(), description: body } }
 }

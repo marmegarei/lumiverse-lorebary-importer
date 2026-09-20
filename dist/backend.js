@@ -132,7 +132,7 @@ function convert(text) {
   try {
     r = JSON.parse(text);
   } catch {
-    throw new Error('Not valid JSON. Export the character as "JSON" from Lorebary (TXT / PNG are not supported here).');
+    throw new Error("Not valid JSON.");
   }
   if (!isObj(r))
     throw new Error("Unexpected JSON: expected an object.");
@@ -144,6 +144,15 @@ function convert(text) {
     return fromDetailed(r);
   throw new Error("Unrecognized format: not a Lorebary character, card or lorebook JSON.");
 }
+function convertText(text, filename = "") {
+  const body = text.replace(/^\uFEFF/, "").trim();
+  if (body.startsWith("{"))
+    return convert(body);
+  if (!body)
+    throw new Error("Empty file.");
+  const name = body.match(/^#\s+(.+)$/m)?.[1] ?? body.match(/^(?:name|nome)\s*:\s*(.+)$/im)?.[1] ?? (filename.replace(/\.[^.]+$/, "") || "Unnamed");
+  return { character: { name: name.trim(), description: body } };
+}
 
 // src/backend.ts
 spindle.onFrontendMessage(async (payload, userId) => {
@@ -151,7 +160,7 @@ spindle.onFrontendMessage(async (payload, userId) => {
     return;
   const reply = (msg) => spindle.sendToFrontend({ ...msg, id: payload.id }, userId);
   try {
-    const { character, book } = convert(String(payload.text ?? ""));
+    const { character, book } = payload.filename ? convertText(String(payload.text ?? ""), payload.filename) : convert(String(payload.text ?? ""));
     let bookId;
     if (book) {
       const created = await spindle.world_books.create({ name: book.name, description: book.description });

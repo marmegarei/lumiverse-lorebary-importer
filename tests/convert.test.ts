@@ -46,3 +46,44 @@ test('bad input gives readable errors', () => {
   expect(() => convert('hello')).toThrow('Not valid JSON')
   expect(() => convert('{"a":1}')).toThrow('Unrecognized')
 })
+
+// --- PNG / TXT ---
+import { pngCardJson } from '../src/png'
+import { convertText } from '../src/convert'
+
+const chunk = (type: string, data: number[]) => {
+  const out = new Uint8Array(12 + data.length)
+  const v = new DataView(out.buffer)
+  v.setUint32(0, data.length)
+  out.set([...type].map((c) => c.charCodeAt(0)), 4)
+  out.set(data, 8) // CRC left as zeros: the reader doesn't check it
+  return out
+}
+const png = (...chunks: Uint8Array[]) => Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...chunks.flatMap((c) => [...c]), ...chunk('IEND', [])])
+const text = (key: string, value: string) => chunk('tEXt', [...key].map((c) => c.charCodeAt(0)).concat(0, [...value].map((c) => c.charCodeAt(0))))
+
+test('png: chara chunk (utf-8 base64) -> card -> character', () => {
+  const card = JSON.stringify({ spec: 'chara_card_v2', data: { name: 'Zoë', description: 'ñ 【Hair】', personality: 'Sly', extensions: { lorebary: { appearance: 'Red' } } } })
+  const b64 = Buffer.from(card, 'utf-8').toString('base64')
+  const json = pngCardJson(png(chunk('IHDR', new Array(13).fill(0)), text('chara', b64)))
+  expect(json).toBe(card)
+  const { character } = convert(json)
+  expect(character).toMatchObject({ name: 'Zoë', personality: 'Sly' })
+  expect(character!.description).toContain('[Appearance]\nRed')
+})
+
+test('png: ccv3 preferred, missing chunk and non-png give errors', () => {
+  const v2 = Buffer.from('{"v":2}').toString('base64')
+  const v3 = Buffer.from('{"v":3}').toString('base64')
+  expect(pngCardJson(png(text('chara', v2), text('ccv3', v3)))).toBe('{"v":3}')
+  expect(() => pngCardJson(png())).toThrow('no character data')
+  expect(() => pngCardJson(new Uint8Array([1, 2, 3]))).toThrow('Not a PNG')
+})
+
+test('txt: title / Name: / filename fallback; whole text kept as description', () => {
+  expect(convertText('# Fox\n\nIdentity: sly').character).toMatchObject({ name: 'Fox', description: '# Fox\n\nIdentity: sly' })
+  expect(convertText('Name: Wolf\nManner: cold').character!.name).toBe('Wolf')
+  expect(convertText('just prose', 'Bear.txt').character!.name).toBe('Bear')
+  expect(convertText(JSON.stringify({ name: 'X', initialMessages: [] })).character!.name).toBe('X')
+  expect(() => convertText('  ')).toThrow('Empty')
+})
