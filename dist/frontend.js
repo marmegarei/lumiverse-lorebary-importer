@@ -59,7 +59,7 @@ function setup(ctx) {
 `);
   go.onclick = () => {
     for (const link of links.value.split(/\s+/).filter(Boolean)) {
-      const id = crypto.randomUUID();
+      const id = ctx.uuid.v4();
       names.set(id, link.replace(/^https?:\/\/(www\.)?/, ""));
       ctx.sendToBackend({ type: "import_url", id, url: link });
     }
@@ -69,7 +69,7 @@ function setup(ctx) {
     try {
       const files = await ctx.uploads.pickFile({ accept: [".json", ".png", ".txt", "application/json", "image/png", "text/plain"], multiple: true, maxSizeBytes: 20 * 1024 * 1024 });
       for (const f of files) {
-        const id = crypto.randomUUID();
+        const id = ctx.uuid.v4();
         names.set(id, f.name);
         try {
           const png = /\.png$/i.test(f.name);
